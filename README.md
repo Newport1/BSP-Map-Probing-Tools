@@ -68,8 +68,8 @@ Ollama only adds a short prose note to the JSON/HTML report. The geometry analys
 
 ## License
 
-MIT (or your preferred open-source license — update this file before publishing).
+MIT 
 
 ## Credits / inspiration
 
-Inspired by the classic SeamshotCalculator approach to identifying simple/complex brush contacts. This tool is a pure-Python reimplementation focused on local, offline, responsible map QA.
+Inspired by the classic [SeamshotCalculator](https://github.com/fionafibration/SeamshotCalculator)approach to identifying simple/complex brush contacts. This tool is a pure-Python reimplementation focused on local, offline, responsible map QA.
