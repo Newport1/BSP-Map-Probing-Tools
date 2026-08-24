@@ -315,6 +315,11 @@ def _decompress_source_lzma(buf: bytes) -> bytes:
     if header_id != 0x414D5A4C:  # little-endian "LZMA"
         raise BspParseError(f"Unexpected LZMA id {header_id:#x}")
     props = buf[12:17]
+    if len(buf) < 17 + lzma_size:
+        raise BspParseError(
+            f"Compressed lump declares {lzma_size} bytes of LZMA data, "
+            f"but only {len(buf) - 17} are present."
+        )
     compressed = buf[17 : 17 + lzma_size]
     # Decode lc/lp/pb and dict_size from the 5-byte properties (Valve style).
     d = props[0]
@@ -329,8 +334,10 @@ def _decompress_source_lzma(buf: bytes) -> bytes:
     decompressor = lzma.LZMADecompressor(format=lzma.FORMAT_RAW, filters=filters)
     out = decompressor.decompress(compressed, max_length=actual_size)
     if len(out) != actual_size:
-        # Some maps tolerate a short read; still return what we got.
-        pass
+        raise BspParseError(
+            f"LZMA lump declares an uncompressed size of {actual_size} bytes, "
+            f"but decompression produced {len(out)} bytes."
+        )
     return out
 
 
