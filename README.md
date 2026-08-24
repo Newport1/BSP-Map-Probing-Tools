@@ -6,7 +6,7 @@ It is designed for **map-author QA** and responsible bug-fix investigation — n
 
 ## What it does
 
-- Parses core VBSP geometry lumps (including typical TF2 maps)
+- Parses core VBSP geometry lumps (including real TF2 maps with **LZMA-compressed lumps**)
 - Classifies simple (axis-aligned box) vs complex solid brushes
 - Finds classic seamshot-style candidates (simple/complex and complex/complex brush-edge contacts)
 - Finds tiny vertical under-gaps between world brushes
@@ -23,7 +23,7 @@ Optional: a short human-readable triage note from a **local** Ollama model (neve
 ## Requirements
 
 - Python 3.8+
-- **No required third-party packages** (stdlib only)
+- **No required third-party packages** (stdlib only; uses the built-in `lzma` module for Valve-style compressed lumps)
 
 Optional:
 
@@ -59,17 +59,24 @@ python3 tf2_bsp_triage.py /path/to/map.bsp --out reports/map --ollama-model llam
 
 Ollama only adds a short prose note to the JSON/HTML report. The geometry analysis itself is fully deterministic.
 
+## LZMA support
+
+Real TF2 maps (VBSP v20) commonly ship with LZMA-compressed lumps. This tool detects the Valve 17-byte LZMA header + fourcc and decompresses them automatically using pure Python (`lzma.FILTER_LZMA1`).
+
+Smoke-tested on `koth_harvest_winter_v3.bsp` (9,480 planes / 3,110 brushes) and `koth_factory.bsp`.
+
 ## Important limitations
 
 - This is a **geometry triage** tool. It does **not** prove an in-game exploit.
 - It does not emulate TF2 weapon traces, projectiles, splash, or prop collision.
 - Results are **candidate locations** for manual validation by the map author.
+- Full seam search is combinatorial and can be slow on large maps in pure CPython.
 - Use only on maps you are authorized to inspect and only for legitimate QA / fix submission.
 
 ## License
 
-MIT 
+MIT
 
 ## Credits / inspiration
 
-Inspired by the classic [SeamshotCalculator](https://github.com/fionafibration/SeamshotCalculator)approach to identifying simple/complex brush contacts. This tool is a pure-Python reimplementation focused on local, offline, responsible map QA.
+Inspired by the classic SeamshotCalculator approach to identifying simple/complex brush contacts. This tool is a pure-Python reimplementation focused on local, offline, responsible map QA.

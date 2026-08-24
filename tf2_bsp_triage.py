@@ -34,6 +34,7 @@ import csv
 import html
 import itertools
 import json
+import lzma
 import math
 import os
 import re
@@ -306,9 +307,47 @@ def read_lumps(data: bytes) -> Tuple[str, int, List[Lump], int]:
     return ident, version, lumps, map_revision
 
 
+def _decompress_source_lzma(buf: bytes) -> bytes:
+    """Decompress a Source-engine LZMA lump (17-byte custom header + raw LZMA1)."""
+    if len(buf) < 17:
+        raise BspParseError("Compressed lump too short for LZMA header.")
+    header_id, actual_size, lzma_size = struct.unpack_from("<III", buf, 0)
+    if header_id != 0x414D5A4C:  # little-endian "LZMA"
+        raise BspParseError(f"Unexpected LZMA id {header_id:#x}")
+    props = buf[12:17]
+    if len(buf) < 17 + lzma_size:
+        raise BspParseError(
+            f"Compressed lump declares {lzma_size} bytes of LZMA data, "
+            f"but only {len(buf) - 17} are present."
+        )
+    compressed = buf[17 : 17 + lzma_size]
+    # Decode lc/lp/pb and dict_size from the 5-byte properties (Valve style).
+    d = props[0]
+    if d >= 9 * 5 * 5:
+        raise BspParseError("Invalid LZMA properties byte.")
+    lc = d % 9
+    d //= 9
+    pb = d // 5
+    lp = d % 5
+    dict_size = struct.unpack_from("<I", props, 1)[0]
+    filters = [{"id": lzma.FILTER_LZMA1, "dict_size": dict_size, "lc": lc, "lp": lp, "pb": pb}]
+    decompressor = lzma.LZMADecompressor(format=lzma.FORMAT_RAW, filters=filters)
+    out = decompressor.decompress(compressed, max_length=actual_size)
+    if len(out) != actual_size:
+        raise BspParseError(
+            f"LZMA lump declares an uncompressed size of {actual_size} bytes, "
+            f"but decompression produced {len(out)} bytes."
+        )
+    return out
+
+
 def lump_bytes(data: bytes, lumps: Sequence[Lump], idx: int) -> bytes:
     lump = lumps[idx]
-    return data[lump.offset : lump.offset + lump.length]
+    raw = data[lump.offset : lump.offset + lump.length]
+    # Non-zero fourcc usually means the lump is LZMA-compressed (fourcc holds uncompressed size).
+    if lump.fourcc != b"\x00\x00\x00\x00" and len(raw) >= 17 and raw[:4] == b"LZMA":
+        return _decompress_source_lzma(raw)
+    return raw
 
 
 def parse_planes(buf: bytes) -> List[Plane]:
